@@ -15,7 +15,7 @@ Set the following variables before you run the script:
 ## How to run the script? 
 During the public preview, logging cannot be enabled programmatically using PowerShell. There is a break on line 38. Please run the script from line 1-37 first, enable logging on the NSP and run line 39 till the end afterwards. 
 
-## The Demo 
+## Demo 
 The script deploys two storage accounts, one of the storage account has Customer Managed Keys (CMK) enabled with the keys stored in KeyVault. 
 
 Demo1: Using the NSP, the storage account connects to AKV without enabling trusted services on AKV. With the NSP in enforced mode, you cannot communicate to AKV or the storage account without explicitly giving IP or subscription access to the NSP. However, the services within the NSP are trusted and can communicate with each other. 
