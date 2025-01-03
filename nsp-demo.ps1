@@ -1,19 +1,22 @@
-#Variables
-$location = "East US 2"
-$rgName = "nsptest1-rg"
-$objID = "90524a30-4993-4f68-be56-50fb5caa45fd" #object ID of the user currently logged on. 
+#variables
+$location = "East US 2" # Region name
+$rgName = "nsptest1-rg" # Resource group name
+$objID = "90524a30-4993-4f68-be56-50fb5caa434e3we" # object ID of the user currently logged on. 
+$subID = "c83ba7df-c127-4f6a-9550-505733356" # subscription ID 
+
+#Import the required Azure PowerShell modules
+Install-Module -Name Az.Network -RequiredVersion 7.7.1-preview -AllowPrerelease
+Import-Module Az.Resources
+Import-Module Az.OperationalInsights
 
 # Connect to the Azure tenant
 Connect-AzAccount
 
 # Set the right subscription 
-Set-AzContext -Subscription "c83ba7df-c127-4f6a-9550-505733e3e165"
+Set-AzContext -Subscription $subid
 
 # Register the Microsoft.Network resource provider
 Register-AzResourceProvider -ProviderNamespace Microsoft.Network
-
-# Install the PowerShell module required for this. 
-Install-Module -Name Az.Network -RequiredVersion 7.7.1-preview -AllowPrerelease
 
 # Create a resource group
 $rg = New-AzResourceGroup -Name $rgName -Location $location
@@ -28,7 +31,26 @@ $storage2 = New-AzStorageAccount -ResourceGroupName $rg.ResourceGroupName -Name 
 # Create a network security perimeter
 $demoNSP = New-AzNetworkSecurityPerimeter -name "demo1-nsp" -location $location -ResourceGroupName $rg.ResourceGroupName
 
-## Enable logging on the NSP. 
+# Create a Log Analytics workspace
+$law = New-AzOperationalInsightsWorkspace -ResourceGroupName $rgName -name "MyWorkspace" -location $location 
+
+# Break for manual intervention to enable logging. 
+Break
+
+ <#
+ Enable logging on the NSP. I currently don't see an option in the current version of the PowerShell module. 
+ It's recommended to enable logging on the NSP at this point and sent them to LAW using the diagnostic settings. 
+#> 
+
+# Enable purge protection on AKV
+Update-AzKeyVault -ResourceGroupName $rg.ResourceGroupName -VaultName $keyVault.VaultName -EnablePurgeProtection
+
+# Create a key on AKV
+New-AzRoleAssignment -ObjectId $objID -RoleDefinitionName "Key Vault Administrator" -Scope $keyVault.ResourceId
+New-AzRoleAssignment -ObjectId $storage1.Identity.PrincipalId -RoleDefinitionName "Key Vault Administrator" -Scope $keyVault.ResourceId
+Start-sleep -seconds 10 # wait for 10 seconds to make sure the roles are created
+$keyName = Add-AzKeyVaultKey -VaultName $keyVault.VaultName -Name "storage-key" -KeyType RSA -Size 4096 -Destination Software
+
 
 # Create a new profile
 $demoNSPProfile = New-AzNetworkSecurityPerimeterProfile -name "nsp-profile" -ResourceGroupName $rg.ResourceGroupName -SecurityPerimeterName $demoNSP.Name
@@ -54,7 +76,4 @@ Set-AzStorageAccount -ResourceGroupName $rg.ResourceGroupName -AccountName $stor
 # Update the association to enforce the access mode
 Update-AzNetworkSecurityPerimeterAssociation -ResourceGroupName $rg.ResourceGroupName -Name $nspAkvAsc.Name -SecurityPerimeterName $demoNSP.Name -AccessMode "Enforced" #AKV
 Update-AzNetworkSecurityPerimeterAssociation -ResourceGroupName $rg.ResourceGroupName -Name $nspStor1Asc.Name -SecurityPerimeterName $demoNSP.Name -AccessMode "Enforced" #storage1
-
-# Associate Storage2 with the above created profile
-#$nspAkvAsc = New-AzNetworkSecurityPerimeterAssociation -ResourceGroupName $rg.ResourceGroupName -Name "nspStor2Asc" -SecurityPerimeterName $demoNSP.Name -AccessMode "Learning" -ProfileId $demoNSPProfile.id -PrivateLinkResourceId $storage2.Id
 
